@@ -19,9 +19,9 @@ package com.aahsk.homeworks.basics
 object Traits {
   import Manipulations._
 
-  sealed trait Dimensions[D <: Dimensions[D]]
+  sealed trait Dimensional[D <: Dimensional[D]]
 
-  sealed trait Shape[D <: Dimensions[D]] extends Located[D] with Bounded[D] with Moveable[D]
+  sealed trait Shaped[D <: Dimensional[D]] extends Located[D] with Bounded[D] with Moveable[D]
 
   sealed trait Surfaced {
     def surfaceArea: Double = area
@@ -32,23 +32,23 @@ object Traits {
     def volume: Double
   }
 
-  sealed trait Located[D <: Dimensions[D]] {
-    val position: Dimensions[D]
+  sealed trait Located[D <: Dimensional[D]] {
+    val position: Dimensional[D]
   }
 
-  sealed trait Bounded[D <: Dimensions[D]] {
-    def min: Dimensions[D]
-    def max: Dimensions[D]
+  sealed trait Bounded[D <: Dimensional[D]] {
+    def min: Dimensional[D]
+    def max: Dimensional[D]
   }
 
-  sealed trait LocatedAndSymmetric[D <: Dimensions[D]] extends Located[D] with Bounded[D] {
-    val boundSize: Dimensions[D]
-    def min: Dimensions[D] = position subtract boundSize
-    def max: Dimensions[D] = position add boundSize
+  sealed trait LocatedAndSymmetric[D <: Dimensional[D]] extends Located[D] with Bounded[D] {
+    val boundSize: Dimensional[D]
+    def min: Dimensional[D] = position subtract boundSize
+    def max: Dimensional[D] = position add boundSize
   }
 
-  sealed trait Moveable[D <: Dimensions[D]] {
-    def move(delta: Dimensions[D]): Shape[D]
+  sealed trait Moveable[D <: Dimensional[D]] {
+    def move(delta: Dimensional[D]): Shaped[D]
   }
 }
 
@@ -56,79 +56,79 @@ object Objects {
   import Traits._;
   import Manipulations._;
 
-  final case class D1(x: Double = 0)                               extends Dimensions[D1]
-  final case class D2(x: Double = 0, y: Double = 0)                extends Dimensions[D2]
-  final case class D3(x: Double = 0, y: Double = 0, z: Double = 0) extends Dimensions[D3]
+  final case class D1(x: Double = 0)                               extends Dimensional[D1]
+  final case class D2(x: Double = 0, y: Double = 0)                extends Dimensional[D2]
+  final case class D3(x: Double = 0, y: Double = 0, z: Double = 0) extends Dimensional[D3]
 
   object OriginD1 extends Located[D1] {
-    val position: Dimensions[D1] = D1()
+    val position: Dimensional[D1] = D1()
   }
 
   object OriginD2 extends Located[D2] {
-    val position: Dimensions[D2] = D2()
+    val position: Dimensional[D2] = D2()
   }
 
   object OriginD3 extends Located[D3] {
-    val position: Dimensions[D3] = D3()
+    val position: Dimensional[D3] = D3()
   }
 
-  final case class Point[D <: Dimensions[D]](position: Dimensions[D]) extends Shape[D] {
-    def min: Dimensions[D]                   = position
-    def max: Dimensions[D]                   = position
-    def move(delta: Dimensions[D]): Point[D] = Point(addDimensions(position, delta))
+  final case class Point[D <: Dimensional[D]](position: Dimensional[D]) extends Shaped[D] {
+    def min: Dimensional[D]                   = position
+    def max: Dimensional[D]                   = position
+    def move(delta: Dimensional[D]): Point[D] = Point(addDimensions(position, delta))
   }
 
-  final case class Circle(center: Dimensions[D2], radius: Double)
-      extends Shape[D2]
+  final case class Circle(center: Dimensional[D2], radius: Double)
+      extends Shaped[D2]
       with LocatedAndSymmetric[D2]
       with Surfaced {
-    val position: Dimensions[D2]            = center
-    val boundSize: Dimensions[D2]           = D2(radius, radius)
-    def move(delta: Dimensions[D2]): Circle = Circle(center add delta, radius)
-    def area: Double                        = Math.PI * Math.pow(radius, 2)
+    val position: Dimensional[D2]            = center
+    val boundSize: Dimensional[D2]           = D2(radius, radius)
+    def move(delta: Dimensional[D2]): Circle = Circle(center add delta, radius)
+    def area: Double                         = Math.PI * Math.pow(radius, 2)
   }
 
-  final case class Rectangle(position: Dimensions[D2], boundSize: Dimensions[D2])
-      extends Shape[D2]
+  final case class Rectangle(position: Dimensional[D2], boundSize: Dimensional[D2])
+      extends Shaped[D2]
       with LocatedAndSymmetric[D2]
       with Surfaced {
-    def move(delta: Dimensions[D2]): Rectangle = Rectangle(position add delta, boundSize)
-    def area: Double                           = ???
+    def move(delta: Dimensional[D2]): Rectangle = Rectangle(position add delta, boundSize)
+    def area: Double                            = boundSize.x
   }
 
-  final case class Cuboid(position: Dimensions[D3], boundSize: Dimensions[D3])
-      extends Shape[D3]
+  final case class Cuboid(position: Dimensional[D3], boundSize: Dimensional[D3])
+      extends Shaped[D3]
       with LocatedAndSymmetric[D3]
       with Surfaced
       with Volumed {
-    def move(delta: Dimensions[D3]): Cuboid = Cuboid(position add delta, boundSize)
-    def area: Double                        = ???
-    def volume: Double                      = ???
+    def move(delta: Dimensional[D3]): Cuboid = Cuboid(position add delta, boundSize)
+    def area: Double                         = ???
+    def volume: Double                       = ???
   }
 
-  final case class Cube(position: Dimensions[D3], size: Double)
-      extends Shape[D3]
+  final case class Cube(position: Dimensional[D3], size: Double)
+      extends Shaped[D3]
       with LocatedAndSymmetric[D3]
       with Surfaced
       with Volumed {
-    val boundSize: Dimensions[D3]         = D3(size, size, size)
-    def move(delta: Dimensions[D3]): Cube = Cube(position add delta, size)
-    def area: Double                      = ???
-    def volume: Double                    = ???
+    val boundSize: Dimensional[D3]         = D3(size, size, size)
+    def move(delta: Dimensional[D3]): Cube = Cube(position add delta, size)
+    def area: Double                       = ???
+    def volume: Double                     = ???
   }
 
-  final case class Triangle[D <: Dimensions[D]](
-      position: Dimensions[D],
-      aOffset: Dimensions[D],
-      bOffset: Dimensions[D],
-      cOffset: Dimensions[D]
-  ) extends Shape[D]
+  final case class Triangle[D <: Dimensional[D]](
+      position: Dimensional[D],
+      aOffset: Dimensional[D],
+      bOffset: Dimensional[D],
+      cOffset: Dimensional[D]
+  ) extends Shaped[D]
       with Surfaced {
-    def min: Dimensions[D]                      = ???
-    def max: Dimensions[D]                      = ???
-    def move(delta: Dimensions[D]): Triangle[D] = ???
-    def area: Double                            = ???
-    def volume: Double                          = ???
+    def min: Dimensional[D]                      = ???
+    def max: Dimensional[D]                      = ???
+    def move(delta: Dimensional[D]): Triangle[D] = ???
+    def area: Double                             = ???
+    def volume: Double                           = ???
   }
 }
 
@@ -136,25 +136,25 @@ object Manipulations {
   import Traits._;
   import Objects._;
 
-  def addDimensions[D <: Dimensions[D]](d1: Dimensions[D], d2: Dimensions[D]): Dimensions[D] =
+  def addDimensions[D <: Dimensional[D]](d1: Dimensional[D], d2: Dimensional[D]): Dimensional[D] =
     (d1, d2) match {
-      case (D1(x1), D1(x2))         => D1(x1 + x2).asInstanceOf[Dimensions[D]]
-      case (D2(x1, y1), D2(x2, y2)) => D2(x1 + x2, y1 + y2).asInstanceOf[Dimensions[D]]
+      case (D1(x1), D1(x2))         => D1(x1 + x2).asInstanceOf[Dimensional[D]]
+      case (D2(x1, y1), D2(x2, y2)) => D2(x1 + x2, y1 + y2).asInstanceOf[Dimensional[D]]
       case (D3(x1, y1, z1), D3(x2, y2, z2)) =>
-        D3(x1 + x2, y1 + y2, z1 + z2).asInstanceOf[Dimensions[D]]
+        D3(x1 + x2, y1 + y2, z1 + z2).asInstanceOf[Dimensional[D]]
     }
 
-  def negateDimensions[D <: Dimensions[D]](d: Dimensions[D]): Dimensions[D] =
+  def negateDimensions[D <: Dimensional[D]](d: Dimensional[D]): Dimensional[D] =
     d match {
-      case (D1(x))       => D1(-x).asInstanceOf[Dimensions[D]]
-      case (D2(x, y))    => D2(-x, -y).asInstanceOf[Dimensions[D]]
-      case (D3(x, y, z)) => D3(-x, -y, -z).asInstanceOf[Dimensions[D]]
+      case (D1(x))       => D1(-x).asInstanceOf[Dimensional[D]]
+      case (D2(x, y))    => D2(-x, -y).asInstanceOf[Dimensional[D]]
+      case (D3(x, y, z)) => D3(-x, -y, -z).asInstanceOf[Dimensional[D]]
     }
 
-  implicit class DimensionOps[D <: Dimensions[D]](value: Dimensions[D]) {
-    def negate(): Dimensions[D]                   = negateDimensions(value)
-    def add(value2: Dimensions[D]): Dimensions[D] = addDimensions(value, value2)
-    def subtract(value2: Dimensions[D]): Dimensions[D] =
+  implicit class DimensionOps[D <: Dimensional[D]](value: Dimensional[D]) {
+    def negate(): Dimensional[D]                    = negateDimensions(value)
+    def add(value2: Dimensional[D]): Dimensional[D] = addDimensions(value, value2)
+    def subtract(value2: Dimensional[D]): Dimensional[D] =
       addDimensions(value, negateDimensions(value2))
   }
 
