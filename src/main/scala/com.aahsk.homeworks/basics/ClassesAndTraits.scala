@@ -17,6 +17,8 @@ package com.aahsk.homeworks.basics
 // exercise is modelling using case classes and traits, and not math.
 
 object Traits {
+  import Manipulations._
+
   sealed trait Dimensions[D <: Dimensions[D]]
 
   sealed trait Shape[D <: Dimensions[D]] extends Located[D] with Bounded[D] with Moveable[D]
@@ -28,6 +30,12 @@ object Traits {
   sealed trait Bounded[D <: Dimensions[D]] {
     def min: Dimensions[D]
     def max: Dimensions[D]
+  }
+
+  sealed trait LocatedAndSymmetric[D <: Dimensions[D]] extends Located[D] with Bounded[D] {
+    def boundSize: Dimensions[D]
+    def min: Dimensions[D] = position subtract boundSize
+    def max: Dimensions[D] = position add boundSize
   }
 
   sealed trait Moveable[D <: Dimensions[D]] {
@@ -61,28 +69,30 @@ object Objects {
     val position: Dimensions[D3] = D3()
   }
 
-  final case class Circle(center: Dimensions[D2], radius: Double) extends Shape[D2] {
+  final case class Circle(center: Dimensions[D2], radius: Double)
+      extends Shape[D2]
+      with LocatedAndSymmetric[D2] {
     val position: Dimensions[D2]            = center
-    def min: Dimensions[D2]                 = position subtract D2(radius, radius)
-    def max: Dimensions[D2]                 = center add D2(radius, radius)
+    val boundSize: Dimensions[D2]           = D2(radius, radius)
     def move(delta: Dimensions[D2]): Circle = Circle(center add delta, radius)
   }
 
-  final case class Rectangle(position: Dimensions[D2], bound: Dimensions[D2]) extends Shape[D2] {
-    def min: Dimensions[D2]                    = position subtract bound
-    def max: Dimensions[D2]                    = position add bound
-    def move(delta: Dimensions[D2]): Rectangle = Rectangle(position add delta, bound)
+  final case class Rectangle(position: Dimensions[D2], boundSize: Dimensions[D2])
+      extends Shape[D2]
+      with LocatedAndSymmetric[D2] {
+    def move(delta: Dimensions[D2]): Rectangle = Rectangle(position add delta, boundSize)
   }
 
-  final case class Cuboid(position: Dimensions[D3], bound: Dimensions[D3]) extends Shape[D3] {
-    def min: Dimensions[D3]                 = position subtract bound
-    def max: Dimensions[D3]                 = position add bound
-    def move(delta: Dimensions[D3]): Cuboid = Cuboid(position add delta, bound)
+  final case class Cuboid(position: Dimensions[D3], boundSize: Dimensions[D3])
+      extends Shape[D3]
+      with LocatedAndSymmetric[D3] {
+    def move(delta: Dimensions[D3]): Cuboid = Cuboid(position add delta, boundSize)
   }
 
-  final case class Cube(position: Dimensions[D3], size: Double) extends Shape[D3] {
-    def min: Dimensions[D3]               = position subtract D3(size, size, size)
-    def max: Dimensions[D3]               = position add D3(size, size, size)
+  final case class Cube(position: Dimensions[D3], size: Double)
+      extends Shape[D3]
+      with LocatedAndSymmetric[D3] {
+    val boundSize: Dimensions[D3]         = D3(size, size, size)
     def move(delta: Dimensions[D3]): Cube = Cube(position add delta, size)
   }
 }
