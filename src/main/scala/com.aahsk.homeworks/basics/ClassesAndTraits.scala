@@ -23,6 +23,15 @@ object Traits {
 
   sealed trait Shape[D <: Dimensions[D]] extends Located[D] with Bounded[D] with Moveable[D]
 
+  sealed trait Surfaced {
+    def surfaceArea: Double = area
+    def area: Double
+  }
+
+  sealed trait Volumed {
+    def volume: Double
+  }
+
   sealed trait Located[D <: Dimensions[D]] {
     val position: Dimensions[D]
   }
@@ -33,7 +42,7 @@ object Traits {
   }
 
   sealed trait LocatedAndSymmetric[D <: Dimensions[D]] extends Located[D] with Bounded[D] {
-    def boundSize: Dimensions[D]
+    val boundSize: Dimensions[D]
     def min: Dimensions[D] = position subtract boundSize
     def max: Dimensions[D] = position add boundSize
   }
@@ -51,12 +60,6 @@ object Objects {
   final case class D2(x: Double = 0, y: Double = 0)                extends Dimensions[D2]
   final case class D3(x: Double = 0, y: Double = 0, z: Double = 0) extends Dimensions[D3]
 
-  final case class Point[D <: Dimensions[D]](position: Dimensions[D]) extends Shape[D] {
-    def min: Dimensions[D]                   = position
-    def max: Dimensions[D]                   = position
-    def move(delta: Dimensions[D]): Point[D] = Point(addDimensions(position, delta))
-  }
-
   object OriginD1 extends Located[D1] {
     val position: Dimensions[D1] = D1()
   }
@@ -69,31 +72,63 @@ object Objects {
     val position: Dimensions[D3] = D3()
   }
 
+  final case class Point[D <: Dimensions[D]](position: Dimensions[D]) extends Shape[D] {
+    def min: Dimensions[D]                   = position
+    def max: Dimensions[D]                   = position
+    def move(delta: Dimensions[D]): Point[D] = Point(addDimensions(position, delta))
+  }
+
   final case class Circle(center: Dimensions[D2], radius: Double)
       extends Shape[D2]
-      with LocatedAndSymmetric[D2] {
+      with LocatedAndSymmetric[D2]
+      with Surfaced {
     val position: Dimensions[D2]            = center
     val boundSize: Dimensions[D2]           = D2(radius, radius)
     def move(delta: Dimensions[D2]): Circle = Circle(center add delta, radius)
+    def area: Double                        = Math.PI * Math.pow(radius, 2)
   }
 
   final case class Rectangle(position: Dimensions[D2], boundSize: Dimensions[D2])
       extends Shape[D2]
-      with LocatedAndSymmetric[D2] {
+      with LocatedAndSymmetric[D2]
+      with Surfaced {
     def move(delta: Dimensions[D2]): Rectangle = Rectangle(position add delta, boundSize)
+    def area: Double                           = ???
   }
 
   final case class Cuboid(position: Dimensions[D3], boundSize: Dimensions[D3])
       extends Shape[D3]
-      with LocatedAndSymmetric[D3] {
+      with LocatedAndSymmetric[D3]
+      with Surfaced
+      with Volumed {
     def move(delta: Dimensions[D3]): Cuboid = Cuboid(position add delta, boundSize)
+    def area: Double                        = ???
+    def volume: Double                      = ???
   }
 
   final case class Cube(position: Dimensions[D3], size: Double)
       extends Shape[D3]
-      with LocatedAndSymmetric[D3] {
+      with LocatedAndSymmetric[D3]
+      with Surfaced
+      with Volumed {
     val boundSize: Dimensions[D3]         = D3(size, size, size)
     def move(delta: Dimensions[D3]): Cube = Cube(position add delta, size)
+    def area: Double                      = ???
+    def volume: Double                    = ???
+  }
+
+  final case class Triangle[D <: Dimensions[D]](
+      position: Dimensions[D],
+      aOffset: Dimensions[D],
+      bOffset: Dimensions[D],
+      cOffset: Dimensions[D]
+  ) extends Shape[D]
+      with Surfaced {
+    def min: Dimensions[D]                      = ???
+    def max: Dimensions[D]                      = ???
+    def move(delta: Dimensions[D]): Triangle[D] = ???
+    def area: Double                            = ???
+    def volume: Double                          = ???
   }
 }
 
