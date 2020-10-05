@@ -38,18 +38,18 @@ object ControlStructures {
   }
 
   sealed trait Result
-  type ErrorResult             = Result
-  type SuccessResult           = Result
-  type ParseError              = ErrorResult
-  type CalculationError        = ErrorResult
-  type NumberCalculationResult = SuccessResult
+  sealed trait ErrorResult             extends Result
+  sealed trait SuccessResult           extends Result
+  sealed trait ParseError              extends ErrorResult
+  sealed trait CalculationError        extends ErrorResult
+  sealed trait NumberCalculationResult extends SuccessResult
 
   final case class DoubleParseError(xs: List[String])          extends ParseError
-  final case class MissingCommandError()                       extends ParseError
+  final case object MissingCommandError                        extends ParseError
   final case class UnknownCommandError(command: String)        extends ParseError
   final case class ExactArgumentCountError(receivedCount: Int) extends ParseError
-  final case class DivisionByZero()                            extends CalculationError
-  final case class NumberCalculationOfNil()                    extends CalculationError
+  final case object DivisionByZero                             extends CalculationError
+  final case object NumberCalculationOfNil                     extends CalculationError
   final case class DivisionResult(a: Double, b: Double, value: Double)
       extends NumberCalculationResult
   final case class SumResult(xs: List[Double], value: Double)     extends NumberCalculationResult
@@ -99,7 +99,7 @@ object ControlStructures {
 
     val tokens = x.split(' ').filterNot(_.isBlank).toList
     tokens match {
-      case Nil => Left(MissingCommandError())
+      case Nil => Left(MissingCommandError)
       case x :: xs =>
         for {
           xs      <- listOfEithersToEitherOfLists(xs.map(toDoubleEither)).leftMap(DoubleParseError)
@@ -113,14 +113,14 @@ object ControlStructures {
   def calculate(x: Command): Either[ErrorResult, Result] = {
     import Command._
     x match {
-      case Divide(_, 0)              => Left(DivisionByZero())
+      case Divide(_, 0)              => Left(DivisionByZero)
       case Divide(dividend, divisor) => Right(DivisionResult(dividend, divisor, dividend / divisor))
       case Sum(xs)                   => Right(SumResult(xs, xs.sum))
-      case Average(Nil)              => Left(NumberCalculationOfNil())
+      case Average(Nil)              => Left(NumberCalculationOfNil)
       case Average(xs)               => Right(AverageResult(xs, xs.sum / xs.length))
-      case Min(Nil)                  => Left(NumberCalculationOfNil())
+      case Min(Nil)                  => Left(NumberCalculationOfNil)
       case Min(xs)                   => Right(MinResult(xs, xs.min))
-      case Max(Nil)                  => Left(NumberCalculationOfNil())
+      case Max(Nil)                  => Left(NumberCalculationOfNil)
       case Max(xs)                   => Right(MaxResult(xs, xs.max))
     }
   }
@@ -130,14 +130,14 @@ object ControlStructures {
     def listCalculation(calculation: String, xs: List[Double], x: Double) =
       f"The ${calculation} of ${xs.mkString(" ")} is ${x}"
     x match {
-      case MissingCommandError()        => error("Missing command to execute")
+      case MissingCommandError          => error("Missing command to execute")
       case UnknownCommandError(command) => error(s"Unknown command '${command}'")
       case ExactArgumentCountError(req) =>
         error(s"This command requires precisely ${req} arguments")
       case DoubleParseError(xs) =>
         error(s"Failed to parse the following numbers: ${xs.mkString(", ")}")
-      case DivisionByZero() => error("Division by zero is not defined")
-      case NumberCalculationOfNil() =>
+      case DivisionByZero => error("Division by zero is not defined")
+      case NumberCalculationOfNil =>
         error("This function isn't defined for an empty list of elements")
       case DivisionResult(a, b, x) => s"${a} divided by ${b} is ${x}"
       case SumResult(xs, x)        => listCalculation("sum", xs, x)
