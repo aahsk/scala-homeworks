@@ -27,5 +27,8 @@ object DataStructures {
       .map {
         case (value, keyValueList) => (keyValueList.keySet, value)
       }
+      .sortBy {
+        case (_, value) => value
+      }
   }
 }
