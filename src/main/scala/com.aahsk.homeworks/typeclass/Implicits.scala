@@ -138,6 +138,9 @@ object Implicits {
 
     object instances {
       import syntax._
+      import cats.Foldable
+      import cats.Traverse
+      import cats.implicits._
 
       implicit val iterableOnceIterate: Iterate[Iterable] = new Iterate[Iterable] {
         override def iterator[T](f: Iterable[T]): Iterator[T] = f.iterator
@@ -176,12 +179,15 @@ object Implicits {
       implicit def charGetSizeScore: GetSizeScore[Char] = (_: Char) => 2
       implicit def intGetSizeScore: GetSizeScore[Int]   = (_: Int) => 4
       implicit def longGetSizeScore: GetSizeScore[Long] = (_: Long) => 8
+      implicit def traverseGetSizeScore[A[_], B: GetSizeScore](implicit
+          traverse: Traverse[A],
+          getSizeScore: GetSizeScore[B]
+      ): GetSizeScore[A[B]] =
+        (xs: A[B]) => {
+          12 + traverse.foldLeft(xs, 0)((acc: SizeScore, x: B) => acc + getSizeScore.apply(x))
+        }
       implicit def stringGetSizeScore: GetSizeScore[String] =
-        (x: String) => 12 + x.map(_.sizeScore).sum
-      implicit def listGetSizeScore[T: GetSizeScore]: GetSizeScore[List[T]] =
-        (xs: List[T]) => 12 + xs.map(_.sizeScore).sum
-      implicit def vectorGetSizeScore[T: GetSizeScore]: GetSizeScore[Vector[T]] =
-        (xs: Vector[T]) => 12 + xs.map(_.sizeScore).sum
+        (x: String) => x.toList.sizeScore
       implicit def arrayGetSizeScore[T: GetSizeScore]: GetSizeScore[Array[T]] =
         (xs: Array[T]) => 12 + xs.map(_.sizeScore).sum
       implicit def mapGetSizeScore[A: GetSizeScore, B: GetSizeScore]: GetSizeScore[Map[A, B]] =
