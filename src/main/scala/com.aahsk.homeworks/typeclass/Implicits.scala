@@ -34,8 +34,10 @@ object Implicits {
     }
 
     object syntax {
-      implicit class GetSizeScoreOps[T: GetSizeScore](inner: T) {
-        def sizeScore: SizeScore = ??? //implement the syntax!
+      implicit class GetSizeScoreOps[T: GetSizeScore](inner: T)(implicit
+          getSizeScore: GetSizeScore[T]
+      ) {
+        def sizeScore: SizeScore = getSizeScore.apply(inner)
       }
     }
 
@@ -67,7 +69,7 @@ object Implicits {
 
     /**
       * Cool custom immutable multi-map collection - does not extend the standard library collection types
-      * (yes, this is a feature)
+      * (yes, this is a feature) - aargh!
       */
     final case class PackedMultiMap[K, +V](inner: ArraySeq[(K, V)])
     object PackedMultiMap {
@@ -115,7 +117,24 @@ object Implicits {
       If you struggle with writing generic instances for Iterate and Iterate2, start by writing instances for
       List and other collections and then replace those with generic instances.
        */
-      implicit def stubGetSizeScore[T]: GetSizeScore[T] = (_: T) => 42
+      implicit def byteGetSizeScore: GetSizeScore[Byte] = (_: Byte) => 1
+      implicit def charGetSizeScore: GetSizeScore[Char] = (_: Char) => 2
+      implicit def intGetSizeScore: GetSizeScore[Int]   = (_: Int) => 4
+      implicit def longGetSizeScore: GetSizeScore[Long] = (_: Long) => 8
+      implicit def stringGetSizeScore: GetSizeScore[String] =
+        (x: String) => 12 + x.map(_.sizeScore).sum
+      implicit def listGetSizeScore[T: GetSizeScore]: GetSizeScore[List[T]] =
+        (xs: List[T]) => 12 + xs.map(_.sizeScore).sum
+      implicit def vectorGetSizeScore[T: GetSizeScore]: GetSizeScore[Vector[T]] =
+        (xs: Vector[T]) => 12 + xs.map(_.sizeScore).sum
+      implicit def arrayGetSizeScore[T: GetSizeScore]: GetSizeScore[Array[T]] =
+        (xs: Array[T]) => 12 + xs.map(_.sizeScore).sum
+      implicit def mapGetSizeScore[A: GetSizeScore, B: GetSizeScore]: GetSizeScore[Map[A, B]] =
+        (xs: Map[A, B]) => 12 + xs.map { case (a, b) => a.sizeScore + b.sizeScore }.sum
+      implicit def packedMultiMapGetSizeScore[A: GetSizeScore, B: GetSizeScore]
+          : GetSizeScore[PackedMultiMap[A, B]] =
+        (xs: PackedMultiMap[A, B]) =>
+          12 + xs.inner.map { case (a, b) => a.sizeScore + b.sizeScore }.sum
     }
   }
 
