@@ -1,5 +1,6 @@
 package com.aahsk.homeworks.typeclass
 
+import scala.annotation.tailrec
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
 
@@ -56,15 +57,57 @@ object Implicits {
     final class MutableBoundedCache[K: GetSizeScore, V: GetSizeScore](maxSizeScore: SizeScore) {
       //with this you can use .sizeScore syntax on keys and values
       import syntax._
+      import instances._
 
       /*
       mutable.LinkedHashMap is a mutable map container which preserves insertion order - this might be useful!
        */
       private val map = mutable.LinkedHashMap.empty[K, V]
 
-      def put(key: K, value: V): Unit = ???
+      /**
+        * Checks whether enough space is available for an allocation to happen
+        */
+      private def allocationAvailable(allocation: SizeScore): Boolean = {
+        val elementSizeScore = map.sizeScore - mutable.LinkedHashMap.empty[K, V].sizeScore
+        val freeSpace        = maxSizeScore - elementSizeScore
+        freeSpace >= allocation
+      }
 
-      def get(key: K): Option[V] = ???
+      /**
+        * Allocates free space in the LinkedHashMap
+        *
+       * @param allocation - the amount of SizeScore that needs to be allocated
+        * @return false if allocation failed, true if allocation succeeded
+        */
+      @tailrec
+      private def cleanGarbageForAllocation(allocation: SizeScore): Boolean = {
+        if (allocationAvailable(allocation)) {
+          true
+        } else {
+          map.headOption match {
+            case None => false
+            case Some((k, _)) =>
+              map.remove(k)
+              cleanGarbageForAllocation(allocation)
+          }
+        }
+      }
+
+      /**
+        * Inserts a key-value pair in cache
+        */
+      def put(key: K, value: V): Unit = {
+        if (!cleanGarbageForAllocation(key.sizeScore + value.sizeScore)) {
+          // As they say in Rust world - lets panic!
+          throw new Exception("Panic: MutableBoundedCache ran out of memory");
+        }
+        map.put(key, value)
+      }
+
+      /**
+        * Retrieves a key-value pair in cache
+        */
+      def get(key: K): Option[V] = map.get(key)
     }
 
     /**
@@ -105,6 +148,17 @@ object Implicits {
       }
       //Provide Iterate2 instances for Map and PackedMultiMap!
       //if the code doesn't compile while you think it should - sometimes full rebuild helps!
+      implicit def mapIterate2: Iterate2[Map] =
+        new Iterate2[Map] {
+          def iterator1[A, B](f: Map[A, B]): Iterator[A] = f.keysIterator
+          def iterator2[A, B](f: Map[A, B]): Iterator[B] = f.valuesIterator
+        }
+
+      implicit def packedMultiMapIterate2: Iterate2[PackedMultiMap] =
+        new Iterate2[PackedMultiMap] {
+          def iterator1[A, B](f: PackedMultiMap[A, B]): Iterator[A] = f.inner.map(_._1).iterator
+          def iterator2[A, B](f: PackedMultiMap[A, B]): Iterator[B] = f.inner.map(_._2).iterator
+        }
 
       /*
       replace this big guy with proper implicit instances for types:
@@ -117,6 +171,7 @@ object Implicits {
       If you struggle with writing generic instances for Iterate and Iterate2, start by writing instances for
       List and other collections and then replace those with generic instances.
        */
+
       implicit def byteGetSizeScore: GetSizeScore[Byte] = (_: Byte) => 1
       implicit def charGetSizeScore: GetSizeScore[Char] = (_: Char) => 2
       implicit def intGetSizeScore: GetSizeScore[Int]   = (_: Int) => 4
@@ -131,6 +186,10 @@ object Implicits {
         (xs: Array[T]) => 12 + xs.map(_.sizeScore).sum
       implicit def mapGetSizeScore[A: GetSizeScore, B: GetSizeScore]: GetSizeScore[Map[A, B]] =
         (xs: Map[A, B]) => 12 + xs.map { case (a, b) => a.sizeScore + b.sizeScore }.sum
+      implicit def mutableLinkedHashMapSizeScore[A: GetSizeScore, B: GetSizeScore]
+          : GetSizeScore[mutable.LinkedHashMap[A, B]] =
+        (xs: mutable.LinkedHashMap[A, B]) =>
+          12 + xs.map { case (a, b) => a.sizeScore + b.sizeScore }.sum
       implicit def packedMultiMapGetSizeScore[A: GetSizeScore, B: GetSizeScore]
           : GetSizeScore[PackedMultiMap[A, B]] =
         (xs: PackedMultiMap[A, B]) =>
@@ -160,13 +219,40 @@ object Implicits {
     )
 
     trait TwitCache {
-      def put(twit: Twit): Unit
+      def put(twit: Twit): Long
       def get(id: Long): Option[Twit]
     }
 
     /*
     Return an implementation based on MutableBoundedCache[Long, Twit]
      */
-    def createTwitCache(maxSizeScore: SizeScore): TwitCache = ???
+    def createTwitCache(maxSizeScore: SizeScore): TwitCache = {
+      import syntax._
+      import instances._
+      implicit val fbiNoteGetSizeScore: GetSizeScore[FbiNote] = (n: FbiNote) =>
+        n.month.sizeScore + n.favouriteChar.sizeScore + n.watchedPewDiePieTimes.sizeScore
+      implicit val twitGetSizeScore: GetSizeScore[Twit] = (t: Twit) => {
+        12 + t.id.sizeScore + t.userId.sizeScore + t.hashTags.sizeScore + t.attributes.sizeScore + t.fbiNotes.sizeScore
+      }
+      new TwitCache {
+        val cache                = new MutableBoundedCache[Long, Twit](maxSizeScore)
+        var lastID: Option[Long] = None;
+        def generateID(): Long =
+          lastID match {
+            case None =>
+              lastID = Some(1L)
+              lastID.get
+            case Some(x) =>
+              lastID = Some(x + 1L)
+              lastID.get
+          }
+        override def put(twit: Twit): Long = {
+          val id = generateID()
+          cache.put(id, twit)
+          id
+        }
+        override def get(id: Long): Option[Twit] = cache.get(id)
+      }
+    }
   }
 }
