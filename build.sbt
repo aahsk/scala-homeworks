@@ -4,6 +4,13 @@ organization := "ch.epfl.scala"
 version := "1.0"
 scalaVersion := "2.13.3"
 
+// Very important feature flags
+scalacOptions ++= Seq(
+  "-deprecation",
+  "-feature",
+  "-Ymacro-annotations"
+)
+
 // Versions
 val http4sVersion         = "0.21.7"
 val circeVersion          = "0.13.0"
