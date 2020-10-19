@@ -14,6 +14,11 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scalaj.http.Http
 
+import scala.util.Try
+import io.circe.Decoder
+import cats.syntax.either._
+import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
+
 /**
   * HOMEWORK:
   *
@@ -21,7 +26,7 @@ import scalaj.http.Http
   * Unfortunately, they don't work as expected out of the box.
   * The task is to fix (rewrite) some of the codecs to make tests pass.
   * You are not supposed to change anything in _class_ MainSpec,
-  * instead of it you are supposed to change whatever you want inside _companion object_ for HomeworkSpec.
+  * instead of it you are supposed to change whatever you want inside _companion object_ for MainSpec.
   *
   * It would be nice to avoid using Encoder/Decoder.forProductN where you specify all field names
   */
@@ -52,14 +57,30 @@ class MainSpec extends AnyWordSpec with Matchers with EitherValues {
 }
 
 object MainSpec {
-  @JsonCodec final case class TeamTotals(
+  @ConfiguredJsonCodec final case class TeamTotals(
       assists: String,
       fullTimeoutRemaining: String,
       plusMinus: String
   )
+  object TeamTotals {
+    implicit val weirdCaseConfig: Configuration = Configuration.default
+      .copy(transformMemberNames = {
+        case x @ "fullTimeoutRemaining" => Configuration.snakeCaseTransformation(x)
+        case x                          => x
+      })
+  }
+
   @JsonCodec final case class TeamBoxScore(totals: TeamTotals)
   @JsonCodec final case class GameStats(hTeam: TeamBoxScore, vTeam: TeamBoxScore)
   @JsonCodec final case class PrevMatchup(gameDate: LocalDate, gameId: String)
+  object PrevMatchup {
+    implicit lazy val dateDecoder: Decoder[LocalDate] =
+      Decoder.decodeString.emap(localDateStr =>
+        Try(LocalDate.parse(localDateStr, DateTimeFormatter.BASIC_ISO_DATE)).toEither
+          .leftMap(err => "LocalDate: " + err.getMessage)
+      )
+  }
+
   @JsonCodec final case class BoxScore(
       basicGameData: Game,
       previousMatchup: PrevMatchup,
