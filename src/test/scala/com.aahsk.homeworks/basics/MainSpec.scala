@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers._
 import org.scalacheck.Arbitrary._
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-class BasicsSpec extends AnyFlatSpec with ScalaCheckDrivenPropertyChecks {
+class MainSpec extends AnyFlatSpec with ScalaCheckDrivenPropertyChecks {
   "gcd" should "be correct for arbitrarily chosen test values" in {
     gcd(0, 0) shouldEqual 0
     gcd(2, 4) shouldEqual 2
