@@ -1,6 +1,6 @@
 package com.aahsk.homeworks.effects
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
 /*
@@ -28,59 +28,97 @@ import scala.util.Try
  */
 object Effects {
 
-  final class IO[A] {
-    def map[B](f: A => B): IO[B] = ???
+  final class IO[A] private (run: () => A) {
 
-    def flatMap[B](f: A => IO[B]): IO[B] = ???
+    def map[B](f: A => B): IO[B] = new IO(() => f(run()))
 
-    def *>[B](another: IO[B]): IO[B] = ???
+    // Looks quite wrong as it executes immediately
+    // Not sure whether/how it can be fixed while still being executably-encoded
+    def flatMap[B](f: A => IO[B]): IO[B] = f(run())
 
-    def as[B](newValue: => B): IO[B] = ???
+    def *>[B](another: IO[B]): IO[B] = flatMap(_ => another)
 
-    def void: IO[Unit] = ???
+    def as[B](newValue: => B): IO[B] = new IO(() => newValue)
 
-    def attempt: IO[Either[Throwable, A]] = ???
+    def void: IO[Unit] = new IO(() => ())
 
-    def option: IO[Option[A]] = ???
+    def attempt: IO[Either[Throwable, A]] = as[Either[Throwable, A]](Try(run()).toEither)
 
-    def handleErrorWith[AA >: A](f: Throwable => IO[AA]): IO[AA] = ???
+    def option: IO[Option[A]] = attempt.map(_.toOption)
 
-    def redeem[B](recover: Throwable => B, map: A => B): IO[B] = ???
+    def handleErrorWith[AA >: A](f: Throwable => IO[AA]): IO[AA] =
+      attempt.flatMap {
+        case Right(x)        => new IO(() => x)
+        case Left(throwable) => f(throwable)
+      }
 
-    def redeemWith[B](recover: Throwable => IO[B], bind: A => IO[B]): IO[B] = ???
+    def redeem[B](recover: Throwable => B, map: A => B): IO[B] =
+      this.map {
+        case throwable: Throwable => recover(throwable)
+        case value                => map(value)
+      }
 
-    def unsafeRunSync(): A = ???
+    def redeemWith[B](recover: Throwable => IO[B], bind: A => IO[B]): IO[B] =
+      this.flatMap {
+        case throwable: Throwable => recover(throwable)
+        case value                => bind(value)
+      }
 
-    def unsafeToFuture(): Future[A] = ???
+    def unsafeRunSync(): A = run()
+
+    def unsafeToFuture(): Future[A] = {
+      val p = Promise[A]()
+      attempt.unsafeRunSync() match {
+        case Right(value)    => p.success(value).future
+        case Left(throwable) => p.failure(throwable).future
+      }
+    }
   }
 
   object IO {
-    def apply[A](body: => A): IO[A] = ???
+    def apply[A](body: => A): IO[A] = new IO(() => body)
 
-    def suspend[A](thunk: => IO[A]): IO[A] = ???
+    // This would make sense if my IO were declaratively encoded
+    // but it's executable-encoded, so no need to unwrap any recursive tree structures
+    def suspend[A](thunk: => IO[A]): IO[A] = thunk
 
-    def delay[A](body: => A): IO[A] = ???
+    def delay[A](body: => A): IO[A] = new IO(() => body)
 
-    def pure[A](a: A): IO[A] = ???
+    def pure[A](a: A): IO[A] = new IO(() => a)
 
-    def fromEither[A](e: Either[Throwable, A]): IO[A] = ???
+    def fromEither[A](e: Either[Throwable, A]): IO[A] =
+      e match {
+        case Left(throwable) => new IO(() => throw throwable).as[A]
+        case Right(value)    => new IO(() => value)
+      }
 
-    def fromOption[A](option: Option[A])(orElse: => Throwable): IO[A] = ???
+    def fromOption[A](option: Option[A])(orElse: => Throwable): IO[A] =
+      option match {
+        case None        => new IO(() => throw orElse).as[A]
+        case Some(value) => new IO(() => value)
+      }
 
-    def fromTry[A](t: Try[A]): IO[A] = ???
+    def fromTry[A](t: Try[A]): IO[A] =
+      t.fold[IO[A]](throwable => new IO(() => throw throwable).as[A], value => new IO(() => value))
 
-    def none[A]: IO[Option[A]] = ???
+    def none[A]: IO[Option[A]] = new IO(() => None)
 
-    def raiseError[A](e: Throwable): IO[A] = ???
+    def raiseError[A](e: Throwable): IO[A] = new IO(() => throw e)
 
-    def raiseUnless(cond: Boolean)(e: => Throwable): IO[Unit] = ???
+    def raiseUnless(cond: Boolean)(e: => Throwable): IO[Unit] =
+      new IO(() =>
+        if (cond) { () }
+        else { throw e }
+      )
 
-    def raiseWhen(cond: Boolean)(e: => Throwable): IO[Unit] = ???
+    def raiseWhen(cond: Boolean)(e: => Throwable): IO[Unit] = raiseUnless(!cond)(e)
 
-    def unlessA(cond: Boolean)(action: => IO[Unit]): IO[Unit] = ???
+    def unlessA(cond: Boolean)(action: => IO[Unit]): IO[Unit] =
+      if (cond) { action }
+      else { unit }
 
-    def whenA(cond: Boolean)(action: => IO[Unit]): IO[Unit] = ???
+    def whenA(cond: Boolean)(action: => IO[Unit]): IO[Unit] = unlessA(!cond)(action)
 
-    val unit: IO[Unit] = ???
+    val unit: IO[Unit] = new IO(() => ())
   }
 }
