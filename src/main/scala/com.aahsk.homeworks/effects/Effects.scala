@@ -88,18 +88,18 @@ object Effects {
 
     def fromEither[A](e: Either[Throwable, A]): IO[A] =
       e match {
-        case Left(throwable) => new IO(() => throw throwable).as[A]
+        case Left(throwable) => new IO(() => throw throwable)
         case Right(value)    => new IO(() => value)
       }
 
     def fromOption[A](option: Option[A])(orElse: => Throwable): IO[A] =
       option match {
-        case None        => new IO(() => throw orElse).as[A]
+        case None        => new IO(() => throw orElse)
         case Some(value) => new IO(() => value)
       }
 
     def fromTry[A](t: Try[A]): IO[A] =
-      t.fold[IO[A]](throwable => new IO(() => throw throwable).as[A], value => new IO(() => value))
+      t.fold[IO[A]](throwable => new IO(() => throw throwable), value => new IO(() => value))
 
     def none[A]: IO[Option[A]] = new IO(() => None)
 
