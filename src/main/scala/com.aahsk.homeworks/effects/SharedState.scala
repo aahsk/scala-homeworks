@@ -3,6 +3,7 @@ package com.aahsk.homeworks.effects
 import cats.Monad
 import cats.effect.concurrent.Ref
 import cats.effect.{Clock, Concurrent, ExitCode, IO, IOApp, Timer}
+import cats.implicits._
 
 import scala.concurrent.duration._
 
@@ -26,22 +27,50 @@ object SharedState extends IOApp {
   }
 
   class RefCache[F[_]: Clock: Monad, K, V](
-      state: Ref[F, Map[K, (Long, V)]],
+      stateref: Ref[F, Map[K, (Long, V)]],
       expiresIn: FiniteDuration
   ) extends Cache[F, K, V] {
+    def get(key: K): F[Option[V]] = stateref.get.map(_.get(key).map { case (_, value) => value })
 
-    def get(key: K): F[Option[V]] = ???
-
-    def put(key: K, value: V): F[Unit] = ???
-
+    def put(key: K, value: V): F[Unit] =
+      Clock[F]
+        .realTime(MILLISECONDS)
+        .flatMap(now =>
+          stateref.getAndUpdate(_.updated(key, (now + expiresIn.toMillis, value))).void
+        )
   }
 
   object Cache {
     def of[F[_]: Clock, K, V](
         expiresIn: FiniteDuration,
-        checkOnExpirationsEvery: FiniteDuration
-    )(implicit T: Timer[F], C: Concurrent[F]): F[Cache[F, K, V]] = ???
+        checkExpirationsOnEvery: FiniteDuration
+    )(implicit T: Timer[F], C: Concurrent[F]): F[Cache[F, K, V]] = {
+      // Update a given state by removing records whose expiration date is in the past
+      def updatedWithoutOlds(now: Long, state: Map[K, (Long, V)]): Map[K, (Long, V)] =
+        state.mapFilter {
+          case (expiration, _) if expiration < now => None
+          case record                              => Some(record)
+        }
 
+      // Sleep a little then check the given state for stale records and remove them
+      def sleepyExpirationCheck(
+          stateRef: Ref[F, Map[K, (Long, V)]]
+      ): F[Unit] =
+        for {
+          _   <- T.sleep(checkExpirationsOnEvery)
+          now <- Clock[F].realTime(MILLISECONDS)
+          _   <- stateRef.getAndUpdate(state => updatedWithoutOlds(now, state))
+        } yield ()
+
+      for {
+        // Create a state reference
+        stateref <- Ref.of(Map[K, (Long, V)]())
+        // Monitor expired state records
+        _ <- C.start(sleepyExpirationCheck(stateref).foreverM.void)
+        // Create a cache reference with the aforementioned state
+        cacheref = new RefCache(stateref, expiresIn)
+      } yield cacheref
+    }
   }
 
   override def run(args: List[String]): IO[ExitCode] = {
