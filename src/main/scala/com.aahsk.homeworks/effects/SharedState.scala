@@ -21,7 +21,11 @@ import scala.concurrent.duration._
 object SharedState extends IOApp {
 
   trait Cache[F[_], K, V] {
+    def keys: F[List[K]]
+
     def get(key: K): F[Option[V]]
+
+    def modify[Z](key: K, modifier: Option[V] => (V, Z)): F[Z]
 
     def put(key: K, value: V): F[Unit]
   }
@@ -30,7 +34,23 @@ object SharedState extends IOApp {
       stateref: Ref[F, Map[K, (Long, V)]],
       expiresIn: FiniteDuration
   ) extends Cache[F, K, V] {
+    def keys: F[List[K]] = stateref.get.map(_.keySet.toList)
+
     def get(key: K): F[Option[V]] = stateref.get.map(_.get(key).map { case (_, value) => value })
+
+    def modify[Z](key: K, modifier: Option[V] => (V, Z)): F[Z] =
+      Clock[F]
+        .realTime(MILLISECONDS)
+        .flatMap(now =>
+          stateref.modify(cachemap => {
+            val recordModification: (V, Z) =
+              modifier(cachemap.get(key).map { case (_, value) => value })
+            val recordNew      = recordModification._1
+            val recordLeftover = recordModification._2
+
+            (cachemap.updated(key, (now + expiresIn.toMillis, recordNew)), recordLeftover)
+          })
+        )
 
     def put(key: K, value: V): F[Unit] =
       Clock[F]
@@ -41,7 +61,7 @@ object SharedState extends IOApp {
   }
 
   object Cache {
-    def of[F[_]: Clock, K, V](
+    def of[F[_]: Clock: Monad, K, V](
         expiresIn: FiniteDuration,
         checkExpirationsOnEvery: FiniteDuration
     )(implicit T: Timer[F], C: Concurrent[F]): F[Cache[F, K, V]] = {
