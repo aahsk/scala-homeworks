@@ -1,4 +1,4 @@
-package com.evolutiongaming.bootcamp.akka.actors
+package com.aahsk.homeworks.akka.actors
 
 import akka.actor._
 

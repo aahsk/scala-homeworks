@@ -1,10 +1,10 @@
-package com.evolutiongaming.bootcamp.akka.actors
+package com.aahsk.homeworks.akka.actors
 
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import com.evolutiongaming.bootcamp.akka.actors.BinaryTreeSet.Operation._
-import com.evolutiongaming.bootcamp.akka.actors.BinaryTreeSet.OperationReply._
-import com.evolutiongaming.bootcamp.akka.actors.BinaryTreeSet.{Operation, OperationReply}
+import com.aahsk.homeworks.akka.actors.BinaryTreeSet.Operation._
+import com.aahsk.homeworks.akka.actors.BinaryTreeSet.OperationReply._
+import com.aahsk.homeworks.akka.actors.BinaryTreeSet.{Operation, OperationReply}
 import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.concurrent.duration._
